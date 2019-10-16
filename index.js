@@ -9,7 +9,11 @@ if (module.hot) {
   });
 }
 
-window.audioCtx = new window.AudioContext();
+console.log("Create win.ac");
+window.resume = function resume(){
+  window.audioCtx = new window.AudioContext();
+
+
 
 var mapped = [...Array(10).keys()]
   .map(k => ("" + (k + 1)).padStart(2, "0"))
@@ -34,6 +38,30 @@ Promise.all(mapped).then(soundBuffers => {
   var currentIteration = 0;
 
   var plays = [];
+
+  window.enqueue = function enqueue(iteration) {
+    var source = audioCtx.createBufferSource();
+    currentIteration = iteration;
+    source.buffer = soundBuffers[iteration];
+    var gainNode = audioCtx.createGain();
+    source.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    gainNode.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+    console.log("gmx", gainNode.gain.maxValue)
+
+    var now = audioCtx.currentTime;
+    var absoluteOffset = (now - startTime);
+    var offset = absoluteOffset - duration * Math.floor(absoluteOffset / duration);
+
+    gainNode.gain.exponentialRampToValueAtTime(1.0, now + QUEUE_DELAY + FADE_TIME);
+    source.start(now + QUEUE_DELAY, offset + QUEUE_DELAY, duration - offset - QUEUE_DELAY);
+    console.log(plays)
+    plays.forEach(p => p[1].gain.exponentialRampToValueAtTime(0.0001, now + QUEUE_DELAY + FADE_TIME) && p[2].stop(now + QUEUE_DELAY + 2 * FADE_TIME));
+    plays = [
+      [now + QUEUE_DELAY, gainNode, source]
+    ];
+    ensureNextSegment();
+  }
 
   enqueue(currentIteration);
   setTimeout(() => (setInterval(() => {
@@ -63,29 +91,7 @@ Promise.all(mapped).then(soundBuffers => {
     ]);
   }
 
-  function enqueue(iteration) {
-    var source = audioCtx.createBufferSource();
-    currentIteration = iteration;
-    source.buffer = soundBuffers[iteration];
-    var gainNode = audioCtx.createGain();
-    source.connect(gainNode);
-    gainNode.connect(audioCtx.destination);
-    gainNode.gain.setValueAtTime(0.0001, audioCtx.currentTime);
-    console.log("gmx", gainNode.gain.maxValue)
 
-    var now = audioCtx.currentTime;
-    var absoluteOffset = (now - startTime);
-    var offset = absoluteOffset - duration * Math.floor(absoluteOffset / duration);
-
-    gainNode.gain.exponentialRampToValueAtTime(1.0, now + QUEUE_DELAY + FADE_TIME);
-    source.start(now + QUEUE_DELAY, offset + QUEUE_DELAY, duration - offset - QUEUE_DELAY);
-    console.log(plays)
-    plays.forEach(p => p[1].gain.exponentialRampToValueAtTime(0.0001, now + QUEUE_DELAY + FADE_TIME) && p[2].stop(now + QUEUE_DELAY + 2 * FADE_TIME));
-    plays = [
-      [now + QUEUE_DELAY, gainNode, source]
-    ];
-    ensureNextSegment();
-  }
-
-  window.enqueue = enqueue;
 })
+}
+
