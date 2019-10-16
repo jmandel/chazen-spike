@@ -1,4 +1,20 @@
-console.log("Start");
+window.onerror = function (message, file, line, col, error) {
+   log("Error occurred: " + error.message);
+   return false;
+};
+
+window.addEventListener("error", function (e) {
+   log("Error occurred: " + e.error.message);
+   return false;
+})
+
+function log(l){
+  const log = window.document.getElementById("log");
+  log.innerHTML += (l + "<br>");
+  console.log(l);
+}
+
+log("Start");
 
 const QUEUE_DELAY = 0.05;
 const FADE_TIME = 0.1;
@@ -9,31 +25,39 @@ if (module.hot) {
   });
 }
 
-console.log("Create win.ac");
+window.AudioContext = window.AudioContext || window.webkitAudioContext;
+
+log("Create win.ac");
 window.resume = function resume(){
   window.audioCtx = new window.AudioContext();
 
 
-
 var mapped = [...Array(10).keys()]
   .map(k => ("" + (k + 1)).padStart(2, "0"))
-  .map(k => `sitting/sitting.${k}.ogg`)
+  .map(k => `sitting/sitting.${k}.mp3`)
   .map(o => fetch(o).then(or => or.arrayBuffer()).then(buffer => {
+    log("One sb: " + buffer.byteLength)
     return new Promise((resolve, reject) => {
+      log("Making promise" + audioCtx.decodeAudioData)
       audioCtx.decodeAudioData(buffer, function (decodedData) {
+        log("decoded One sb")
         resolve(decodedData);
+      }, function(err){
+        log("decodeAudioData: " + err);
       });
     })
   }))
 
+log("Make sbs")
 Promise.all(mapped).then(soundBuffers => {
 
-  console.log(soundBuffers);
+  log("Got all promises")
+  log(soundBuffers);
   var startTime = audioCtx.currentTime;
   window.soundBuffers = soundBuffers
 
   var duration = Math.min.apply(null, soundBuffers.map(b => b.duration));
-  console.log("midur", duration)
+  log("midur", duration)
   var durationMs = duration * 1000;
   var currentIteration = 0;
 
@@ -47,7 +71,7 @@ Promise.all(mapped).then(soundBuffers => {
     source.connect(gainNode);
     gainNode.connect(audioCtx.destination);
     gainNode.gain.setValueAtTime(0.0001, audioCtx.currentTime);
-    console.log("gmx", gainNode.gain.maxValue)
+    log("gmx", gainNode.gain.maxValue)
 
     var now = audioCtx.currentTime;
     var absoluteOffset = (now - startTime);
@@ -55,7 +79,7 @@ Promise.all(mapped).then(soundBuffers => {
 
     gainNode.gain.exponentialRampToValueAtTime(1.0, now + QUEUE_DELAY + FADE_TIME);
     source.start(now + QUEUE_DELAY, offset + QUEUE_DELAY, duration - offset - QUEUE_DELAY);
-    console.log(plays)
+    log(plays)
     plays.forEach(p => p[1].gain.exponentialRampToValueAtTime(0.0001, now + QUEUE_DELAY + FADE_TIME) && p[2].stop(now + QUEUE_DELAY + 2 * FADE_TIME));
     plays = [
       [now + QUEUE_DELAY, gainNode, source]
@@ -78,7 +102,7 @@ Promise.all(mapped).then(soundBuffers => {
     var nextSegmentTime = startTime + duration * Math.ceil(absoluteOffset / duration);
 
     var source = audioCtx.createBufferSource();
-    console.log("Ensure next", currentIteration, nextSegmentTime);
+    log("Ensure next", currentIteration, nextSegmentTime);
     source.buffer = soundBuffers[nextSegmentFrom(currentIteration)];
     var gainNode = audioCtx.createGain();
     source.connect(gainNode);
